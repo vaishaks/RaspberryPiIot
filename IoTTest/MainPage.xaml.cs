@@ -3,45 +3,40 @@ using Newtonsoft.Json;
 using System;
 using System.Diagnostics;
 using System.Text;
-using System.Threading;
 using Windows.Devices.Gpio;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-// The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
-
 namespace IoTTest
 {
-    /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
-    /// </summary>
     public sealed partial class MainPage : Page
     {
-        static DeviceClient deviceClient;
-        static string iotHubUri = "";
-        static string deviceKey = "";
-        static string deviceId = "";
-        static DispatcherTimer timer;
-        static GpioPin pin;
+        private string iotHubUri = "";
+        private string deviceKey = "";
+        private string deviceId = "";
+        private static DeviceClient deviceClient;
+        private static DispatcherTimer timer;
+        private static GpioPin pin;
+        private static GpioPinValue pinValue;
         const int LED_PIN = 5;
-        const int PIR_PIN = 4;
-        static GpioPinValue pinValue;
+        const int PIR_PIN = 4;        
 
         public MainPage()
         {
             this.InitializeComponent();
-            InitGPIO();
+
+            //Create IoT hub device client
             deviceClient = DeviceClient.Create(iotHubUri, new DeviceAuthenticationWithRegistrySymmetricKey(deviceId, deviceKey), TransportType.Mqtt);
+
+            //Initialize PIR sensor and bind event handler
             var pirSensor = new PirSensor(PIR_PIN, PirSensor.SensorType.ActiveHigh);
             pirSensor.motionDetected += PirSensorOnMotionDetected;
+
+            //Initialize LED pin and cloud to device thread
+            InitGPIO();
             ReceiveC2dAsync();
-            timer = new DispatcherTimer();
-            timer.Interval = TimeSpan.FromMilliseconds(1000);
-            timer.Tick += Timer_Tick;
-            if (pin != null)
-            {
-                timer.Start();
-            }
+
+            StartPushingNoMotionData();
             Debug.WriteLine("Initialized...");
         }
 
@@ -115,6 +110,17 @@ namespace IoTTest
 
             await deviceClient.SendEventAsync(message);
             Debug.WriteLine("Motion Detected!");
+        }
+
+        private void StartPushingNoMotionData()
+        {
+            timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(1000);
+            timer.Tick += Timer_Tick;
+            if (pin != null)
+            {
+                timer.Start();
+            }
         }
 
         private void Timer_Tick(object sender, object e)
