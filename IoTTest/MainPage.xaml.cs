@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using Windows.Devices.Gpio;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -34,7 +35,28 @@ namespace IoTTest
             var pirSensor = new PirSensor(PIR_PIN, PirSensor.SensorType.ActiveHigh);
             pirSensor.motionDetected += PirSensorOnMotionDetected;
             ReceiveC2dAsync();
+            timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(1000);
+            timer.Tick += Timer_Tick;
+            if (pin != null)
+            {
+                timer.Start();
+            }
             Debug.WriteLine("Initialized...");
+        }
+
+        private async void MotionTimerThread()
+        {
+            var pirData = new PirData()
+            {
+                DeviceId = deviceId,
+                IsMotionDetected = false
+            };
+            var messageString = JsonConvert.SerializeObject(pirData);
+            var message = new Message(Encoding.ASCII.GetBytes(messageString));
+
+            await deviceClient.SendEventAsync(message);
+            Debug.WriteLine("Motion not detected!");
         }
 
         private static async void ReceiveC2dAsync()
@@ -97,16 +119,7 @@ namespace IoTTest
 
         private void Timer_Tick(object sender, object e)
         {
-            if (pinValue == GpioPinValue.High)
-            {
-                pinValue = GpioPinValue.Low;
-                pin.Write(pinValue);
-            }
-            else
-            {
-                pinValue = GpioPinValue.High;
-                pin.Write(pinValue);
-            }
+            MotionTimerThread();
         }
     }
 }
